@@ -340,6 +340,9 @@ extract_backup() {
 cleanup_wpe_files() {
     print_info "Cleaning up WP Engine files..."
 
+    # Remove .ddev folder if it exists in backup (would conflict with new config)
+    rm -rf .ddev 2>/dev/null || true
+
     # Files and directories to remove
     local wpe_files=(
         "wp-content/advanced-cache.php"

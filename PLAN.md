@@ -86,6 +86,7 @@ A Bash script that will be executable as `ddev wpe-import` from anywhere, import
 #### 2.3 WP Engine Cleanup
 Delete these files/directories (use `rm -rf`, ignore if not exist):
 ```
+.ddev/                          (if backup contains old DDEV config)
 wp-content/advanced-cache.php
 wp-content/object-cache.php
 wp-content/mu-plugins/force-strong-passwords/
