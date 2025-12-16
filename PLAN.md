@@ -132,43 +132,43 @@ Use a hybrid approach with blacklist, whitelist, and interactive mode:
 - Core settings: `DISALLOW_FILE_EDIT`, `DISALLOW_FILE_MODS`
 - Security: `WP2FA_ENCRYPT_KEY` (if present, also triggers adding `DISABLE_2FA_LOGIN = true`)
 
-**Interactive mode:**
-- For any `define()` statements not in blacklist or whitelist
-- Display the constant name and value
-- Prompt: "Keep this constant? (y/n)"
-- Collect approved constants for inclusion
+**Unknown constants (not in blacklist or whitelist):**
+- Auto-preserved in wp-config.php
+- Tracked in a separate array for reporting
+- Warning displayed at end of import listing all unknown constants that were preserved
+- User can review wp-config.php and remove any that aren't needed
 
 **Implementation (grep + sed with line preservation):**
 ```bash
-# Extract all define statements
-DEFINE_LINES=$(grep -E "^\s*define\s*\(" wp-config-backup.php)
+# Initialize arrays
+CONSTANTS_TO_PRESERVE=()
+UNKNOWN_CONSTANTS=()
 
-# Loop through each line
+# Loop through each define statement
 while IFS= read -r line; do
     # Extract constant name only (first parameter)
     CONSTANT_NAME=$(echo "$line" | sed -E "s/.*define\s*\(\s*['\"]([^'\"]+)['\"].*/\1/")
 
     # Check blacklist - skip if found
-    if [[ " ${BLACKLIST[@]} " =~ " ${CONSTANT_NAME} " ]]; then
+    if is_in_array "$CONSTANT_NAME" "${BLACKLIST[@]}"; then
         continue
     fi
 
     # Check whitelist - preserve entire line if found
-    if [[ " ${WHITELIST[@]} " =~ " ${CONSTANT_NAME} " ]]; then
+    if is_in_array "$CONSTANT_NAME" "${WHITELIST[@]}"; then
         CONSTANTS_TO_PRESERVE+=("$line")
         continue
     fi
 
-    # Interactive mode - ask user
-    echo "Found: $CONSTANT_NAME"
-    echo "  $line"
-    read -p "Keep this? (y/n) " answer
-    [[ "$answer" == "y" ]] && CONSTANTS_TO_PRESERVE+=("$line")
-done <<< "$DEFINE_LINES"
+    # Unknown constant - auto-preserve and track for warning
+    CONSTANTS_TO_PRESERVE+=("$line")
+    UNKNOWN_CONSTANTS+=("$CONSTANT_NAME")
+done < <(grep -E "^\s*define\s*\(" wp-config-backup.php)
 ```
 
 **Storage:**
-- Store all whitelisted + approved constants in array (as complete define() lines)
+- Store all whitelisted + unknown constants in array (as complete define() lines)
+- Store unknown constant names separately for end-of-import warning
 - Store table prefix
 - Track whether WP2FA_ENCRYPT_KEY was found (to add DISABLE_2FA_LOGIN)
 
@@ -311,6 +311,13 @@ Project: projectname
 URL: https://projectname.ddev.site
 Location: /path/to/project
 Original wp-config.php saved as: wp-config-backup.php
+
+# If unknown constants were auto-preserved:
+Unknown constants were auto-preserved in wp-config.php:
+  - UNKNOWN_CONSTANT
+  - SECOND_UNKNOWN_CONSTANT
+
+Review these in wp-config.php and remove any that aren't needed.
 
 The project is started and ready for use.
 

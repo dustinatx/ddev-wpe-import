@@ -39,10 +39,10 @@ The script follows a 5-phase flow defined in `main()`:
 
 ## Key Implementation Details
 
-### Constants Handling (lines 38-71)
+### Constants Handling (lines 38-76)
 - `BLACKLIST` array: WPE-specific constants, security keys, DB settings - always excluded
 - `WHITELIST` array: Safe constants to auto-preserve (debug flags, performance settings)
-- Unknown constants trigger interactive prompt
+- Unknown constants are auto-preserved and a warning is shown at the end listing them
 
 ### wp-config.php Generation (lines 408-500)
 Creates custom wp-config.php with:

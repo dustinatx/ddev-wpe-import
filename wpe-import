@@ -386,6 +386,7 @@ analyze_wp_config() {
 
     # Extract and process constants
     CONSTANTS_TO_PRESERVE=()
+    UNKNOWN_CONSTANTS=()
     HAS_WP2FA_KEY=false
 
     # Read define statements
@@ -414,14 +415,9 @@ analyze_wp_config() {
             continue
         fi
 
-        # Interactive mode - ask user
-        echo ""
-        print_warning "Found unknown constant: $const_name"
-        echo "  $line"
-        read -r -p "Keep this constant? (y/n): " keep_const
-        if [[ "$keep_const" =~ ^[Yy] ]]; then
-            CONSTANTS_TO_PRESERVE+=("$line")
-        fi
+        # Unknown constant - auto-preserve and track for warning
+        CONSTANTS_TO_PRESERVE+=("$line")
+        UNKNOWN_CONSTANTS+=("$const_name")
 
     done < <(grep -E "^\s*define\s*\(" wp-config-backup.php)
 
@@ -691,6 +687,18 @@ show_success_message() {
     echo "Location: $PROJECT_DIR"
     echo "Original wp-config.php saved as: wp-config-backup.php"
     echo ""
+
+    # Show warning about auto-preserved unknown constants
+    if [[ ${#UNKNOWN_CONSTANTS[@]} -gt 0 ]]; then
+        print_warning "Unknown constants were auto-preserved in wp-config.php:"
+        for const_name in "${UNKNOWN_CONSTANTS[@]}"; do
+            echo "  - $const_name"
+        done
+        echo ""
+        echo "Review these in wp-config.php and remove any that aren't needed."
+        echo ""
+    fi
+
     echo "The project is started and ready for use."
     echo ""
 
