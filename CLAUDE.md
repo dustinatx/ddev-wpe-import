@@ -31,11 +31,11 @@ Then run from anywhere: `ddev wpe-import`
 
 The script follows a 5-phase flow defined in `main()`:
 
-1. **Input Collection** - Prompts for backup path, project directory, project name, password reset option
+1. **Input Collection** - Prompts for backup path, project directory, project name, admin account options
 2. **Project Setup** - Extracts backup, cleans WPE files, analyzes wp-config.php, configures DDEV
-3. **DDEV & Database** - Starts DDEV, imports database, updates URLs via search-replace
-4. **Admin Password Reset** - Optional password reset for admin users
-5. **Completion** - Shows success message with useful commands
+3. **DDEV & Database** - Starts DDEV, imports database, runs search-replace on URLs
+4. **Admin Account Management** - Optional: create default admin (admin:password) OR reset existing admin password
+5. **Completion** - Shows success message with cd instruction or useful commands
 
 ## Key Implementation Details
 
@@ -55,7 +55,17 @@ Creates custom wp-config.php with:
 ### Special Cases
 - `WP2FA_ENCRYPT_KEY` in whitelist triggers auto-adding `DISABLE_2FA_LOGIN = true`
 - Windows paths (`C:\...`) auto-converted to WSL format (`/mnt/c/...`)
+- Surrounding quotes stripped from pasted paths
 - Existing DDEV projects in target directory cause immediate abort
+- Old URL extracted via direct MySQL query (bypasses wp-config-ddev.php WP_SITEURL override)
+- Uses `--skip-themes --skip-plugins` on WP-CLI commands for speed/reliability
+
+### DDEV Global Command
+The script includes annotations for DDEV global command support:
+```bash
+## CanRunGlobally: true
+## Description: Import WP Engine backups into new DDEV WordPress projects
+```
 
 ## Reference
 

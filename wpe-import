@@ -686,18 +686,26 @@ show_success_message() {
     echo "Project: $PROJECT_NAME"
     echo "URL: $ddev_url"
     echo "Location: $PROJECT_DIR"
+    echo "Original wp-config.php saved as: wp-config-backup.php"
     echo ""
     echo "The project is started and ready for use."
     echo ""
-    echo "Useful commands:"
-    echo "  ddev start          - Start the project"
-    echo "  ddev stop           - Stop the project"
-    echo "  ddev wp             - Run WP-CLI commands"
-    echo "  ddev launch         - Open site in browser"
-    echo "  ddev describe       - Show project details"
-    echo ""
-    echo "Original wp-config.php saved as: wp-config-backup.php"
-    echo ""
+
+    if [[ "$ORIGINAL_DIR" != "$PROJECT_DIR" ]]; then
+        # User is not in project directory - show cd instruction
+        echo "To work in this project, run:"
+        echo "  cd $PROJECT_DIR"
+        echo ""
+    else
+        # User is already in project directory - show useful commands
+        echo "Useful commands:"
+        echo "  ddev start          - Start the project"
+        echo "  ddev stop           - Stop the project"
+        echo "  ddev wp             - Run WP-CLI commands"
+        echo "  ddev launch         - Open site in browser"
+        echo "  ddev describe       - Show project details"
+        echo ""
+    fi
 }
 
 # =============================================================================
@@ -705,6 +713,9 @@ show_success_message() {
 # =============================================================================
 
 main() {
+    # Save original directory to show cd instructions later
+    ORIGINAL_DIR="$(pwd)"
+
     echo ""
     echo "========================================"
     echo "  DDEV WP Engine Import"

@@ -46,9 +46,10 @@ A Bash script that will be executable as `ddev wpe-import` from anywhere, import
 - Check if DDEV project with this name already exists: `ddev list | grep projectname`
 - If exists, show error and ask for different name
 
-#### 1.4 Admin Password Reset Option
-- Ask: "Do you want to reset an admin user password after import? (y/n)"
-- Store response for later
+#### 1.4 Admin Account Options
+- First ask: "Create a new admin account? (username: admin, password: password) (y/n)"
+- If no, ask: "Do you want to reset an existing admin user's password after import? (y/n)"
+- Store responses for later
 
 #### 1.5 Confirmation Prompt
 - Display summary:
@@ -58,7 +59,7 @@ A Bash script that will be executable as `ddev wpe-import` from anywhere, import
   - Project Directory: /path/to/project
   - Project Name: projectname
   - DDEV URL: https://projectname.ddev.site
-  - Reset Admin Password: Yes/No
+  - Create Admin Account: Yes (admin:password) / Reset Admin Password: Yes / Admin Account Changes: None
 
   Proceed? (y/n)
   ```
@@ -259,42 +260,39 @@ require_once ABSPATH . 'wp-settings.php';
 - Import: `ddev import-db --file=wp-content/mysql.sql`
 - After successful import, delete the database file: `rm wp-content/mysql.sql`
 
-#### 3.3 Extract Old URL
-- Query database for old URL:
+#### 3.3 Extract Old URL and Search-Replace
+- Query database directly for old URL (bypasses wp-config-ddev.php constants):
   ```bash
-  OLD_URL=$(ddev wp option get siteurl --quiet)
+  OLD_URL=$(ddev mysql -N -e "SELECT option_value FROM ${TABLE_PREFIX}options WHERE option_name = 'siteurl' LIMIT 1")
   ```
-- **If WP-CLI command fails**: Abort with error
-- Keep full URL with protocol (e.g., `https://oldsite.wpengine.com`)
-
-#### 3.4 Update Site URLs
+- **If query fails or returns empty**: Abort with error
 - Get new DDEV URL: `NEW_URL="https://projectname.ddev.site"`
-- Update WordPress options:
+- Replace old URL with new URL throughout database:
   ```bash
-  ddev wp option update home "$NEW_URL"
-  ddev wp option update siteurl "$NEW_URL"
+  ddev wp search-replace "$OLD_URL" "$NEW_URL" --all-tables --skip-themes --skip-plugins
   ```
-
-#### 3.5 Search-Replace
-- Replace old domain with new domain throughout database:
-  ```bash
-  ddev wp search-replace "$OLD_URL" "$NEW_URL" --all-tables
-  ```
+- Note: We don't need to update home/siteurl options because `wp-config-ddev.php` defines `WP_HOME` and `WP_SITEURL` constants that override the database values
 
 ---
 
-### Phase 4: Admin Password Reset (Optional)
+### Phase 4: Admin Account Management (Optional)
 
-#### 4.1 If User Opted for Password Reset
+#### 4.1 If User Opted to Create Default Admin
+- Check if 'admin' user already exists
+- If exists: update password to "password"
+- If not: create new user with `ddev wp user create admin admin@example.com --role=administrator --user_pass="password"`
+- Display confirmation message
+
+#### 4.2 If User Opted for Password Reset (only if not creating default admin)
 - List admin users:
   ```bash
-  ddev wp user list --role=administrator --format=table
+  ddev wp user list --role=administrator --format=table --skip-themes --skip-plugins
   ```
-- Prompt user to enter username from the list
-- Prompt for new password (with confirmation)
+- Prompt user to enter username from the list (loop until valid)
+- Prompt for new password (with confirmation, hidden input)
 - Reset password:
   ```bash
-  ddev wp user update USERNAME --user_pass=NEWPASSWORD
+  ddev wp user update USERNAME --user_pass=NEWPASSWORD --skip-themes --skip-plugins
   ```
 - Display confirmation message
 
@@ -304,20 +302,28 @@ require_once ABSPATH . 'wp-settings.php';
 
 #### 5.1 Success Message
 ```
-✓ WP Engine import complete!
+============================================
+WP Engine import complete!
+============================================
 
 Project: projectname
 URL: https://projectname.ddev.site
 Location: /path/to/project
+Original wp-config.php saved as: wp-config-backup.php
 
+The project is started and ready for use.
+
+# If user is NOT in project directory:
+To work in this project, run:
+  cd /path/to/project
+
+# If user IS in project directory:
 Useful commands:
   ddev start          - Start the project
   ddev stop           - Stop the project
   ddev wp             - Run WP-CLI commands
   ddev launch         - Open site in browser
   ddev describe       - Show project details
-
-Original wp-config.php saved as: wp-config-backup.php
 ```
 
 ---
@@ -346,10 +352,14 @@ Use proper exit codes and clear error messages for each failure point.
 
 ### Script Structure
 - Shebang: `#!/bin/bash`
+- DDEV annotations: `## CanRunGlobally: true` and `## Description:` for global command support
 - Set error handling: `set -e` (exit on error), but use conditional checks where we want to continue
 - Use functions for each major phase
 - Use variables for paths, names, URLs
 - Color output for better UX (green for success, red for errors, yellow for prompts)
+- Use `read -r` to preserve backslashes in user input (important for Windows paths)
+- Strip surrounding quotes from pasted paths
+- Use `--skip-themes --skip-plugins` on WP-CLI commands for speed and reliability
 
 ### Path Conversion Function
 ```bash
