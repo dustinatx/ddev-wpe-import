@@ -1,5 +1,8 @@
 #!/bin/bash
 
+## CanRunGlobally: true
+## Description: Import WP Engine backups into new DDEV WordPress projects
+
 # =============================================================================
 # ddev wpe-import - Import WP Engine backups into DDEV WordPress projects
 # =============================================================================
@@ -45,7 +48,7 @@ BLACKLIST=(
     "AUTH_KEY" "SECURE_AUTH_KEY" "LOGGED_IN_KEY" "NONCE_KEY"
     "AUTH_SALT" "SECURE_AUTH_SALT" "LOGGED_IN_SALT" "NONCE_SALT"
     # Database connection
-    "DB_NAME" "DB_USER" "DB_PASSWORD" "DB_HOST" "DB_CHARSET" "DB_COLLATE"
+    "DB_NAME" "DB_USER" "DB_PASSWORD" "DB_HOST" "DB_HOST_SLAVE" "DB_CHARSET" "DB_COLLATE"
     # Caching
     "WP_CACHE"
     # Filesystem
@@ -57,6 +60,8 @@ BLACKLIST=(
     # We set these ourselves
     "DISABLE_2FA_LOGIN" "WP_DEBUG" "WP_DEBUG_LOG" "WP_DEBUG_DISPLAY"
     "AUTOMATIC_UPDATER_DISABLED" "WP_AUTO_UPDATE_CORE" "WP_ENVIRONMENT_TYPE"
+    # WordPress core (we define these ourselves)
+    "ABSPATH"
 )
 
 WHITELIST=(
@@ -136,7 +141,13 @@ get_backup_path() {
     local path
     while true; do
         echo ""
-        read -p "Enter path to WP Engine backup zip file: " path
+        read -r -p "Enter path to WP Engine backup zip file: " path
+
+        # Strip surrounding quotes if present
+        path="${path#\"}"
+        path="${path%\"}"
+        path="${path#\'}"
+        path="${path%\'}"
 
         # Convert Windows path if needed
         path=$(convert_windows_path "$path")
@@ -167,12 +178,12 @@ get_project_directory() {
 
     echo ""
     echo "Current directory: $current_dir"
-    read -p "Create project here? (y/n): " use_current
+    read -r -p "Create project here? (y/n): " use_current
 
     if [[ "$use_current" =~ ^[Yy] ]]; then
         target_dir="$current_dir"
     else
-        read -p "Enter target directory path: " target_dir
+        read -r -p "Enter target directory path: " target_dir
         target_dir=$(expand_path "$target_dir")
     fi
 
@@ -185,7 +196,7 @@ get_project_directory() {
     # Check if directory exists and is not empty
     if [[ -d "$target_dir" ]] && [[ -n "$(ls -A "$target_dir" 2>/dev/null)" ]]; then
         print_warning "Directory exists and is not empty: $target_dir"
-        read -p "Use this directory anyway? (y/n): " use_anyway
+        read -r -p "Use this directory anyway? (y/n): " use_anyway
         if [[ ! "$use_anyway" =~ ^[Yy] ]]; then
             print_error "Aborted by user"
             exit 1
@@ -201,7 +212,7 @@ get_project_name() {
 
     while true; do
         echo ""
-        read -p "Enter project name: " name
+        read -r -p "Enter project name: " name
 
         # Sanitize the name
         sanitized=$(sanitize_project_name "$name")
@@ -226,14 +237,23 @@ get_project_name() {
     done
 }
 
-get_password_reset_option() {
+get_admin_options() {
     echo ""
-    read -p "Do you want to reset an admin user password after import? (y/n): " reset_pass
+    read -r -p "Create a new admin account? (username: admin, password: password) (y/n): " create_admin
 
-    if [[ "$reset_pass" =~ ^[Yy] ]]; then
-        RESET_PASSWORD=true
-    else
+    if [[ "$create_admin" =~ ^[Yy] ]]; then
+        CREATE_DEFAULT_ADMIN=true
         RESET_PASSWORD=false
+    else
+        CREATE_DEFAULT_ADMIN=false
+        echo ""
+        read -r -p "Do you want to reset an existing admin user's password after import? (y/n): " reset_pass
+
+        if [[ "$reset_pass" =~ ^[Yy] ]]; then
+            RESET_PASSWORD=true
+        else
+            RESET_PASSWORD=false
+        fi
     fi
 }
 
@@ -248,11 +268,17 @@ show_confirmation() {
     echo "  Project Directory: $PROJECT_DIR"
     echo "  Project Name: $PROJECT_NAME"
     echo "  DDEV URL: $ddev_url"
-    echo "  Reset Admin Password: $([ "$RESET_PASSWORD" = true ] && echo "Yes" || echo "No")"
+    if [[ "$CREATE_DEFAULT_ADMIN" = true ]]; then
+        echo "  Create Admin Account: Yes (admin:password)"
+    elif [[ "$RESET_PASSWORD" = true ]]; then
+        echo "  Reset Admin Password: Yes"
+    else
+        echo "  Admin Account Changes: None"
+    fi
     echo "============================================"
     echo ""
 
-    read -p "Proceed? (y/n): " proceed
+    read -r -p "Proceed? (y/n): " proceed
 
     if [[ ! "$proceed" =~ ^[Yy] ]]; then
         print_info "Aborted by user"
@@ -389,7 +415,7 @@ analyze_wp_config() {
         echo ""
         print_warning "Found unknown constant: $const_name"
         echo "  $line"
-        read -p "Keep this constant? (y/n): " keep_const
+        read -r -p "Keep this constant? (y/n): " keep_const
         if [[ "$keep_const" =~ ^[Yy] ]]; then
             CONSTANTS_TO_PRESERVE+=("$line")
         fi
@@ -527,9 +553,9 @@ import_database() {
 update_urls() {
     print_info "Updating site URLs..."
 
-    # Get old URL from database
+    # Get old URL directly from database (not WP-CLI, as wp-config-ddev.php overrides it)
     local old_url
-    old_url=$(ddev wp option get siteurl --quiet)
+    old_url=$(ddev mysql -N -e "SELECT option_value FROM ${TABLE_PREFIX}options WHERE option_name = 'siteurl' LIMIT 1")
 
     if [[ -z "$old_url" ]]; then
         print_error "Could not extract old site URL from database"
@@ -538,23 +564,56 @@ update_urls() {
 
     local new_url="https://${PROJECT_NAME}.ddev.site"
 
+    # Check if URLs are already the same (shouldn't happen, but just in case)
+    if [[ "$old_url" == "$new_url" ]]; then
+        print_info "URLs already match, skipping search-replace"
+        print_success "URLs OK"
+        return
+    fi
+
     print_info "Old URL: $old_url"
     print_info "New URL: $new_url"
 
     # Update home and siteurl options
-    ddev wp option update home "$new_url"
-    ddev wp option update siteurl "$new_url"
+    ddev wp option update home "$new_url" --skip-themes --skip-plugins
+    ddev wp option update siteurl "$new_url" --skip-themes --skip-plugins
 
     # Search-replace throughout database
     print_info "Running search-replace..."
-    ddev wp search-replace "$old_url" "$new_url" --all-tables
+    ddev wp search-replace "$old_url" "$new_url" --all-tables --skip-themes --skip-plugins
 
     print_success "URLs updated"
 }
 
 # =============================================================================
-# Phase 4: Admin Password Reset (Optional)
+# Phase 4: Admin Account Management (Optional)
 # =============================================================================
+
+create_default_admin() {
+    if [[ "$CREATE_DEFAULT_ADMIN" != true ]]; then
+        return
+    fi
+
+    echo ""
+    print_info "Creating default admin account..."
+
+    # Check if 'admin' user already exists
+    if ddev wp user get admin --field=ID &>/dev/null; then
+        print_warning "User 'admin' already exists, updating password instead"
+        if ddev wp user update admin --user_pass="password" --skip-themes --skip-plugins; then
+            print_success "Password updated for existing 'admin' user"
+        else
+            print_error "Failed to update password for 'admin' user"
+        fi
+    else
+        # Create new admin user
+        if ddev wp user create admin admin@example.com --role=administrator --user_pass="password" --skip-themes --skip-plugins; then
+            print_success "Admin account created (username: admin, password: password)"
+        else
+            print_error "Failed to create admin account"
+        fi
+    fi
+}
 
 reset_admin_password() {
     if [[ "$RESET_PASSWORD" != true ]]; then
@@ -567,27 +626,31 @@ reset_admin_password() {
 
     # List admin users
     echo "Available admin users:"
-    ddev wp user list --role=administrator --format=table
+    ddev wp user list --role=administrator --format=table --skip-themes --skip-plugins
     echo ""
 
-    # Get username
+    # Get username (loop until valid)
     local username
-    read -p "Enter username to reset password for: " username
+    while true; do
+        read -r -p "Enter username to reset password for: " username
 
-    # Verify user exists and is admin
-    if ! ddev wp user get "$username" --field=roles 2>/dev/null | grep -q "administrator"; then
-        print_error "User '$username' is not an administrator or doesn't exist"
-        return
-    fi
+        # Verify user exists and is admin
+        if ddev wp user get "$username" --field=roles --skip-themes --skip-plugins 2>/dev/null | grep -q "administrator"; then
+            break
+        fi
+
+        print_error "User '$username' is not an administrator or doesn't exist. Please try again."
+        echo ""
+    done
 
     # Get new password (hidden input)
     local password
     local password_confirm
 
     while true; do
-        read -s -p "Enter new password: " password
+        read -rs -p "Enter new password: " password
         echo ""
-        read -s -p "Confirm new password: " password_confirm
+        read -rs -p "Confirm new password: " password_confirm
         echo ""
 
         if [[ "$password" != "$password_confirm" ]]; then
@@ -653,7 +716,7 @@ main() {
     get_backup_path
     get_project_directory
     get_project_name
-    get_password_reset_option
+    get_admin_options
     show_confirmation
 
     # Phase 2: Project Setup
@@ -669,7 +732,8 @@ main() {
     import_database
     update_urls
 
-    # Phase 4: Admin Password Reset (Optional)
+    # Phase 4: Admin Account Management (Optional)
+    create_default_admin
     reset_admin_password
 
     # Phase 5: Completion

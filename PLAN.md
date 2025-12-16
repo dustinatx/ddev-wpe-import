@@ -115,13 +115,14 @@ Use a hybrid approach with blacklist, whitelist, and interactive mode:
 **Blacklist (always exclude):**
 - WPE-specific: `WPE_APIKEY`, `PWP_NAME`, `WPE_CLUSTER_ID`, `WPE_CLUSTER_TYPE`, `IS_WPE`, `IS_WPE_SNAPSHOT`, `WPE_ISP`, `WPE_BPOD`, `WPE_RO_FILESYSTEM`, `WPE_LARGEFS_BUCKET`, `WPE_SFTP_PORT`, `WPE_SFTP_ENDPOINT`, `WPE_LBMASTER_IP`, `WPE_CDN_DISABLE_ALLOWED`, `WPE_FORCE_SSL_LOGIN`, `WPE_EXTERNAL_URL`, `WPE_WHITELABEL`, `WPE_BETA_TESTER`
 - Security keys/salts: `AUTH_KEY`, `SECURE_AUTH_KEY`, `LOGGED_IN_KEY`, `NONCE_KEY`, `AUTH_SALT`, `SECURE_AUTH_SALT`, `LOGGED_IN_SALT`, `NONCE_SALT`
-- Database connection: `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_CHARSET`, `DB_COLLATE`
+- Database connection: `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_HOST_SLAVE`, `DB_CHARSET`, `DB_COLLATE`
 - `WP_CACHE` (WPE-specific caching)
 - `FS_METHOD`, `FS_CHMOD_DIR`, `FS_CHMOD_FILE` (filesystem settings)
 - `FORCE_SSL_LOGIN`, `WP_TURN_OFF_ADMIN_BAR`, `DISABLE_WP_CRON`, `ALTERNATE_WP_CRON`, `WP_CRON_LOCK_TIMEOUT` (WPE/hosting defaults)
 - `WPLANG` (deprecated since WP 4.0)
 - `DISABLE_2FA_LOGIN` (we set this ourselves when WP2FA_ENCRYPT_KEY is present)
 - `WP_DEBUG`, `WP_DEBUG_LOG`, `WP_DEBUG_DISPLAY`, `AUTOMATIC_UPDATER_DISABLED`, `WP_AUTO_UPDATE_CORE`, `WP_ENVIRONMENT_TYPE` (we set these ourselves or they're redundant)
+- `ABSPATH` (WordPress core - we define this ourselves)
 
 **Whitelist (auto-preserve):**
 - Debug flags: `SCRIPT_DEBUG`, `SAVEQUERIES`
