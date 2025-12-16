@@ -1,4 +1,4 @@
-# ddev wpe-import
+# wpe-import: Import WP Engine backups into DDEV
 
 A DDEV command that imports WP Engine backup zips into local WordPress development environments.
 
