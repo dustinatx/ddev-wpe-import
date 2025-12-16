@@ -77,6 +77,9 @@ A Bash script that will be executable as `ddev wpe-import` from anywhere, import
 - Extract: `unzip -q backup.zip`
 - Verify extraction successful
 - Delete the zip copy from project directory (NOT the original)
+- **Verify required files exist:**
+  - If `wp-config.php` doesn't exist: Abort with error "wp-config.php not found in backup"
+  - If `wp-content/mysql.sql` doesn't exist: Abort with error "Database file not found at wp-content/mysql.sql"
 
 #### 2.3 WP Engine Cleanup
 Delete these files/directories (use `rm -rf`, ignore if not exist):
@@ -98,7 +101,6 @@ wp-content/mu-plugins/wpengine-security-auditor.php
 ```
 
 #### 2.4 wp-config.php Analysis
-- **If wp-config.php doesn't exist**: Abort with error "wp-config.php not found in backup"
 - Rename: `mv wp-config.php wp-config-backup.php`
 - Extract table prefix from wp-config-backup.php:
   - Use grep/sed: `grep '$table_prefix' wp-config-backup.php`
@@ -115,7 +117,7 @@ Use a hybrid approach with blacklist, whitelist, and interactive mode:
 - Database connection: `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_CHARSET`, `DB_COLLATE`
 - `WP_CACHE` (WPE-specific caching)
 - `FS_METHOD`, `FS_CHMOD_DIR`, `FS_CHMOD_FILE` (filesystem settings)
-- `FORCE_SSL_LOGIN`, `WP_TURN_OFF_ADMIN_BAR`, `DISABLE_WP_CRON` (WPE defaults)
+- `FORCE_SSL_LOGIN`, `WP_TURN_OFF_ADMIN_BAR`, `DISABLE_WP_CRON`, `ALTERNATE_WP_CRON`, `WP_CRON_LOCK_TIMEOUT` (WPE/hosting defaults)
 - `WPLANG` (deprecated since WP 4.0)
 - `DISABLE_2FA_LOGIN` (we set this ourselves when WP2FA_ENCRYPT_KEY is present)
 - `WP_DEBUG`, `WP_DEBUG_LOG`, `WP_DEBUG_DISPLAY`, `AUTOMATIC_UPDATER_DISABLED`, `WP_AUTO_UPDATE_CORE`, `WP_ENVIRONMENT_TYPE` (we set these ourselves or they're redundant)
@@ -123,7 +125,7 @@ Use a hybrid approach with blacklist, whitelist, and interactive mode:
 **Whitelist (auto-preserve):**
 - Debug flags: `SCRIPT_DEBUG`, `SAVEQUERIES`
 - Performance: `WP_POST_REVISIONS`, `AUTOSAVE_INTERVAL`, `WP_MEMORY_LIMIT`, `WP_MAX_MEMORY_LIMIT`, `EMPTY_TRASH_DAYS`
-- Core settings: `ALTERNATE_WP_CRON`, `WP_CRON_LOCK_TIMEOUT`, `DISALLOW_FILE_EDIT`, `DISALLOW_FILE_MODS`
+- Core settings: `DISALLOW_FILE_EDIT`, `DISALLOW_FILE_MODS`
 - Security: `WP2FA_ENCRYPT_KEY` (if present, also triggers adding `DISABLE_2FA_LOGIN = true`)
 
 **Interactive mode:**
@@ -167,7 +169,7 @@ done <<< "$DEFINE_LINES"
 - Track whether WP2FA_ENCRYPT_KEY was found (to add DISABLE_2FA_LOGIN)
 
 #### 2.5 DDEV Configuration
-- Run: `ddev config --project-type=wordpress --docroot=. --create-docroot=false --project-name=projectname`
+- Run: `ddev config --project-type=wordpress --project-name=projectname`
 - This creates `.ddev/config.yaml` and `wp-config-ddev.php`
 - DDEV also creates a `wp-config.php`, but we replace it in step 2.6
 
@@ -236,9 +238,7 @@ require_once ABSPATH . 'wp-settings.php';
 - Wait for completion
 
 #### 3.2 Database Import
-- Check if `wp-content/mysql.sql` exists
-- If NOT found, exit with error: `"Error: Database file not found at wp-content/mysql.sql"`
-- If found, import: `ddev import-db --file=wp-content/mysql.sql`
+- Import: `ddev import-db --file=wp-content/mysql.sql`
 - After successful import, delete the database file: `rm wp-content/mysql.sql`
 
 #### 3.3 Extract Old URL
