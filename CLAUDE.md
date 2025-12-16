@@ -66,7 +66,3 @@ The script includes annotations for DDEV global command support:
 ## CanRunGlobally: true
 ## Description: Import WP Engine backups into new DDEV WordPress projects
 ```
-
-## Reference
-
-See `PLAN.md` for detailed implementation decisions and the complete blacklist/whitelist rationale.
