@@ -15,7 +15,8 @@ A Bash script that will be executable as `ddev wpe-import` from anywhere, import
 
 #### 1.0 Prerequisites Check
 - Check if `unzip` command is available: `command -v unzip`
-- If not found, abort with error: "Error: unzip command not found. Please install unzip."
+- Check if `curl` command is available: `command -v curl` (needed for fetching auth keys)
+- If not found, abort with error
 - Assume DDEV is installed (will fail naturally if not)
 
 #### 1.1 Backup Zip Location
@@ -176,6 +177,9 @@ done <<< "$DEFINE_LINES"
 #### 2.6 wp-config.php Creation
 Always replace DDEV's wp-config.php with a custom version (WITHOUT `#ddev-generated`) for imported sites.
 
+- Fetch fresh authentication keys/salts from `https://api.wordpress.org/secret-key/1.1/salt/`
+- If fetch fails, abort with error
+
 **Structure:**
 ```php
 <?php
@@ -193,6 +197,19 @@ define('WP_DEBUG_DISPLAY', false);
 @ini_set('display_errors', 0);
 define('AUTOMATIC_UPDATER_DISABLED', true);
 define('WP_ENVIRONMENT_TYPE', 'local');
+
+// ======================
+// Authentication Keys and Salts
+// ======================
+// (fetched from WordPress.org API)
+define('AUTH_KEY',         '...');
+define('SECURE_AUTH_KEY',  '...');
+define('LOGGED_IN_KEY',    '...');
+define('NONCE_KEY',        '...');
+define('AUTH_SALT',        '...');
+define('SECURE_AUTH_SALT', '...');
+define('LOGGED_IN_SALT',   '...');
+define('NONCE_SALT',       '...');
 
 // ======================
 // Table Prefix
@@ -307,8 +324,9 @@ Original wp-config.php saved as: wp-config-backup.php
 ## Error Handling
 
 Throughout the script, handle these error cases:
-- Missing unzip command
+- Missing unzip or curl command
 - Invalid zip file path
+- Failed to fetch authentication keys from WordPress.org
 - Target directory already contains a DDEV project
 - Unzip failure
 - wp-config.php not found in backup

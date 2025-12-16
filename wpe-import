@@ -124,6 +124,11 @@ check_prerequisites() {
         exit 1
     fi
 
+    if ! command -v curl &> /dev/null; then
+        print_error "curl command not found. Please install curl."
+        exit 1
+    fi
+
     print_success "Prerequisites OK"
 }
 
@@ -408,6 +413,16 @@ configure_ddev() {
 create_wp_config() {
     print_info "Creating custom wp-config.php..."
 
+    # Fetch fresh authentication keys and salts from WordPress API
+    print_info "Fetching authentication keys from WordPress.org..."
+    local auth_keys
+    auth_keys=$(curl -s https://api.wordpress.org/secret-key/1.1/salt/)
+
+    if [[ -z "$auth_keys" ]] || [[ ! "$auth_keys" =~ AUTH_KEY ]]; then
+        print_error "Failed to fetch authentication keys from WordPress.org"
+        exit 1
+    fi
+
     # Build preserved constants section
     local preserved_constants=""
     if [[ ${#CONSTANTS_TO_PRESERVE[@]} -gt 0 ]]; then
@@ -449,6 +464,11 @@ define('WP_DEBUG_DISPLAY', false);
 @ini_set('display_errors', 0);
 define('AUTOMATIC_UPDATER_DISABLED', true);
 define('WP_ENVIRONMENT_TYPE', 'local');
+
+// ======================
+// Authentication Keys and Salts
+// ======================
+${auth_keys}
 
 // ======================
 // Table Prefix

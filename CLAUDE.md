@@ -44,9 +44,10 @@ The script follows a 5-phase flow defined in `main()`:
 - `WHITELIST` array: Safe constants to auto-preserve (debug flags, performance settings)
 - Unknown constants trigger interactive prompt
 
-### wp-config.php Generation (lines 408-476)
+### wp-config.php Generation (lines 408-500)
 Creates custom wp-config.php with:
 - Local dev defaults (WP_DEBUG, AUTOMATIC_UPDATER_DISABLED, etc.)
+- Fresh authentication keys/salts fetched from `https://api.wordpress.org/secret-key/1.1/salt/`
 - Extracted table prefix
 - Preserved constants from original
 - DDEV database config inclusion
