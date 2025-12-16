@@ -32,6 +32,7 @@ A Bash script that will be executable as `ddev wpe-import` from anywhere, import
 - Ask: "Create project here? (y/n)"
 - If no, prompt for target directory path
 - Handle relative and absolute paths
+- **If `.ddev/config.yaml` exists**: Abort with error "This directory already contains a DDEV project"
 - If directory exists and is not empty (including hidden files like `.git`), ask if they want to use it anyway
 
 #### 1.3 Project Name
@@ -308,6 +309,7 @@ Original wp-config.php saved as: wp-config-backup.php
 Throughout the script, handle these error cases:
 - Missing unzip command
 - Invalid zip file path
+- Target directory already contains a DDEV project
 - Unzip failure
 - wp-config.php not found in backup
 - Table prefix parsing failure
