@@ -592,20 +592,20 @@ create_default_admin() {
     fi
 
     echo ""
-    print_info "Creating default admin account..."
+    print_info "Creating admin account for local testing..."
 
     # Check if 'admin' user already exists
     if ddev wp user get admin --field=ID &>/dev/null; then
         print_warning "User 'admin' already exists, updating password instead"
-        if ddev wp user update admin --user_pass="password" --skip-themes --skip-plugins; then
+        if ddev wp user update admin --user_pass="password" --skip-themes --skip-plugins &>/dev/null; then
             print_success "Password updated for existing 'admin' user"
         else
             print_error "Failed to update password for 'admin' user"
         fi
     else
         # Create new admin user
-        if ddev wp user create admin admin@example.com --role=administrator --user_pass="password" --skip-themes --skip-plugins; then
-            print_success "Admin account created (username: admin, password: password)"
+        if ddev wp user create admin admin@example.com --role=administrator --user_pass="password" --skip-themes --skip-plugins &>/dev/null; then
+            print_success "Created admin account (username: admin, password: password)"
         else
             print_error "Failed to create admin account"
         fi
@@ -686,6 +686,8 @@ show_success_message() {
     echo "Project: $PROJECT_NAME"
     echo "URL: $ddev_url"
     echo "Location: $PROJECT_DIR"
+    echo ""
+    echo "The project is started and ready for use."
     echo ""
     echo "Useful commands:"
     echo "  ddev start          - Start the project"
