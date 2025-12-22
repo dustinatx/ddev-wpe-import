@@ -388,6 +388,7 @@ analyze_wp_config() {
     CONSTANTS_TO_PRESERVE=()
     UNKNOWN_CONSTANTS=()
     HAS_WP2FA_KEY=false
+    WP2FA_LINE=""
 
     # Read define statements
     while IFS= read -r line; do
@@ -405,13 +406,16 @@ analyze_wp_config() {
             continue
         fi
 
+        # Handle WP2FA_ENCRYPT_KEY separately (special placement in wp-config.php)
+        if [[ "$const_name" == "WP2FA_ENCRYPT_KEY" ]]; then
+            HAS_WP2FA_KEY=true
+            WP2FA_LINE="$line"
+            continue
+        fi
+
         # Check whitelist - preserve if found
         if is_in_array "$const_name" "${WHITELIST[@]}"; then
             CONSTANTS_TO_PRESERVE+=("$line")
-            # Track WP2FA_ENCRYPT_KEY
-            if [[ "$const_name" == "WP2FA_ENCRYPT_KEY" ]]; then
-                HAS_WP2FA_KEY=true
-            fi
             continue
         fi
 
@@ -448,6 +452,16 @@ create_wp_config() {
         exit 1
     fi
 
+    # Build WP2FA section if WP2FA_ENCRYPT_KEY was found
+    local wp2fa_section=""
+    if [[ "$HAS_WP2FA_KEY" = true ]]; then
+        wp2fa_section="
+/** WP 2FA plugin data encryption key. For more information please visit melapress.com */
+${WP2FA_LINE}
+define( 'DISABLE_2FA_LOGIN', true );
+"
+    fi
+
     # Build preserved constants section
     local preserved_constants=""
     if [[ ${#CONSTANTS_TO_PRESERVE[@]} -gt 0 ]]; then
@@ -463,22 +477,19 @@ create_wp_config() {
 "
     fi
 
-    # Add DISABLE_2FA_LOGIN if WP2FA_ENCRYPT_KEY was found
-    local disable_2fa=""
-    if [[ "$HAS_WP2FA_KEY" = true ]]; then
-        disable_2fa="// Disable 2FA for local development (WP2FA_ENCRYPT_KEY is preserved above)
-define('DISABLE_2FA_LOGIN', true);
-
-"
-    fi
-
     # Write the new wp-config.php
     cat > wp-config.php << WPCONFIG
 <?php
 /**
  * wp-config.php for imported WPE site
  * This file is user-managed (not DDEV-generated)
- */
+ */${wp2fa_section}
+
+/** Database charset to use in creating database tables. */
+define( 'DB_CHARSET', 'utf8' );
+
+/** The database collate type. Don't change this if in doubt. */
+define( 'DB_COLLATE', 'utf8_unicode_ci' );
 
 // ======================
 // Local Development Defaults
@@ -500,7 +511,7 @@ ${auth_keys}
 // ======================
 \$table_prefix = '${TABLE_PREFIX}';
 
-${preserved_constants}${disable_2fa}// ======================
+${preserved_constants}// ======================
 // DDEV Database Configuration
 // ======================
 \$ddev_settings = dirname(__FILE__) . '/wp-config-ddev.php';
