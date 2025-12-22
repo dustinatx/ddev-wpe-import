@@ -587,7 +587,7 @@ update_urls() {
     # Search-replace throughout database
     # (WP_HOME and WP_SITEURL are set by wp-config-ddev.php, so we don't need to update those options)
     print_info "Running search-replace..."
-    ddev wp search-replace "$old_url" "$new_url" --all-tables --skip-themes --skip-plugins
+    ddev wp search-replace "$old_url" "$new_url" --all-tables --precise --skip-columns=guid
 
     print_success "URLs updated"
 }
